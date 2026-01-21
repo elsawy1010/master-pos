@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: pos-postgres
+    environment:
+      POSTGRES_DB: pos_system
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - pos-network
+
+  # Frontend (TanStack Start / Vite)
+  frontend:
+    image: node:24-alpine
+    container_name: pos-frontend
+    working_dir: /app
+    user: "${UID}:${GID}"
+    command: npm run dev
+    volumes:
+      - .:/app
+    ports:
+      - "3000:3000"
+    environment:
+      - HOST=0.0.0.0
+      - VITE_PORT=3000
+      - DATABASE_URL=postgres://postgres:postgres123@postgres:5432/pos_system
+    depends_on:
+      - postgres
+    networks:
+      - pos-network
+
+  socketio:
+    image: node:24-alpine
+    container_name: pos-socketio
+    working_dir: /app
+    user: "${UID}:${GID}"
+    command: npx tsx src/server/socket.ts
+    volumes:
+      - .:/app
+    ports:
+      - "3001:3001"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres123@postgres:5432/pos_system
+    depends_on:
+      - postgres
+    networks:
+      - pos-network
+
+volumes:
+  postgres_data:
+
+networks:
+  pos-network:
+    driver: bridge
